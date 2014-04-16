@@ -1,3 +1,7 @@
+/* Hate Andrew Shell implemented by Peter Czupil */
+/* Design by Doxhound, 2014 */
+/* Note: undefined behaviour on Linux machines, run on MINIX */
+
 #define _POSIX_C_SOURCE 200809L
 #include <stdio.h>
 #include <stdlib.h>
@@ -37,6 +41,7 @@ void zombie_handler(int signo){
 }/* end zombie_handler */
 
 int main(int argc, char *argv[]) {
+  FILE *is_error;
   int i, j, chld_status;
   int REDIR_OUT = 0;
   int REDIR_IN = 0;
@@ -45,7 +50,7 @@ int main(int argc, char *argv[]) {
   int job_ind = 0;
   long pid;
   char *infile, *outfile, *pipe_in, *pipe_out;
-  char *prompt = "hash1.0%";
+  char *prompt = "[hash-1.0]%"; /* hate ash */
   char **args; 
   char *exec_args[15];/* args to send to execvp */
   job job_array[MAX_JOBS]; /* array of structures to store job list */
@@ -58,24 +63,36 @@ int main(int argc, char *argv[]) {
   /* install new action */
   sigaction(SIGCHLD, &new_action, NULL);
 
+  /* main loop; reset flags, parse arguments, fork and handle errors */
   while(1) {
     REDIR_IN = 0;
     REDIR_OUT = 0;
     REDIR_PIPE = 0;
     BKGRND_PROC = 0;
     cmd_size = 0;
+    
+    /* say something nice to the operator */
     printf("%s ", prompt);
     args = get_line();
     if(!args) break;
     if(args[0]  == NULL)
       continue;
     if(!strcmp(args[0], "exit")) exit(EXIT_STATUS);
+    
+    /* Extra feature: change prompt */
+    if(!strcmp(args[0], "prompt") && args[1] != NULL){
+      if(!strcmp(args[1], "default")){
+        prompt = "[hash-1.0]%";
+        continue;
+      }
+      prompt = *args[1];
+      continue;
+    }/* end prompt feature */
 
     /* A loop to parse command line arguments */
     j = 0;
     for(i = 0; args[i] != NULL; i++){
       cmd_size++;
-      fflush(stdout);
       if(!strcmp("&", args[i])){
           BKGRND_PROC = 1;
           break;
@@ -103,13 +120,11 @@ int main(int argc, char *argv[]) {
     if(REDIR_IN || REDIR_OUT || REDIR_PIPE){
       for(i = 0; i < j; i++){
         exec_args[i] = args[i];
-        printf("Exec_args: %s\n", exec_args[i]);
       }
       exec_args[i] = NULL;
     }else{
       for(i = 0; i < cmd_size; i++){
         exec_args[i] = args[i];
-        printf("exec_args: %s\n", exec_args[i]);
       }
       exec_args[i] = NULL;
     }
@@ -126,11 +141,22 @@ int main(int argc, char *argv[]) {
         continue;
       }else{
         /*child code*/
-        if(REDIR_IN)
-          freopen(infile, "r", stdin);
-        if(REDIR_OUT)
-          freopen(outfile, "w", stdout);
-        printf("Ampersand? %s\n", args[cmd_size-1]);
+        if(REDIR_IN){
+          is_error = freopen(infile, "r", stdin);
+          if(is_error == NULL){
+            EXIT_STATUS = EXIT_FAILURE;
+            printf("Could not open file: %s\n", infile);
+            continue;
+           }
+        }/* end if REDIR_IN */
+        if(REDIR_OUT){
+          is_error = freopen(outfile, "w", stdout);
+          if(is_error == NULL){
+            EXIT_STATUS = EXIT_FAILURE;
+            printf("Could not open file: %s\n", outfile);
+            continue;
+           }
+        }/* end if REDIR_OUT */
         args[cmd_size - 1] = NULL;
         job_size++;
         execvp(args[0], exec_args);
@@ -148,11 +174,22 @@ int main(int argc, char *argv[]) {
         waitpid(pid, &chld_status, 0);
 
       }else{
-        if(REDIR_IN)
-          freopen(infile, "r", stdin);
-        if(REDIR_OUT)
-          freopen(outfile, "w", stdout);
-        printf("args[0] = %s\n", args[0]);
+        if(REDIR_IN){
+          is_error = freopen(infile, "r", stdin);
+          if(is_error == NULL){
+            EXIT_STATUS = EXIT_FAILURE;
+            printf("Could not open file: %s\n", infile);
+            continue;
+           }
+        }/* end if REDIR_IN */
+        if(REDIR_OUT){
+          is_error = freopen(outfile, "w", stdout);
+          if(is_error == NULL){
+            EXIT_STATUS = EXIT_FAILURE;
+            printf("Could not open file: %s\n", outfile);
+            continue;
+           }
+        }/* end if REDIR_OUT */
         execvp(args[0], exec_args);
         printf("Could not execute %s\n", args[0]);
         EXIT_STATUS = 1;

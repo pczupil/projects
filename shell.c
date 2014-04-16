@@ -1,5 +1,6 @@
 #define _POSIX_C_SOURCE 200809L
 #include <stdio.h>
+#include <stdlib.h>
 #include <signal.h>
 #include <string.h>
 #include <unistd.h>
@@ -144,7 +145,7 @@ int main(int argc, char *argv[]) {
         continue;
       }
       if(pid != 0){
-        wait(&chld_status);
+        waitpid(pid, &chld_status, 0);
 
       }else{
         if(REDIR_IN)
